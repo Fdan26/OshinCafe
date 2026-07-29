@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Work+Sans:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+.no-scroll {
+  scrollbar-width: none;
+}
+.no-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  font-family: 'Work Sans', sans-serif;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .app-shell {
+    background: #fff !important;
+    min-height: auto;
+  }
+
+  .app-header,
+  .app-footer,
+  .app-switcher {
+    display: none !important;
+  }
+
+  .app-showcase {
+    padding: 8mm 0 !important;
+    justify-content: center;
+    gap: 12mm;
+  }
+
+  .app-divider {
+    display: none !important;
+  }
+
+  .phone-frame {
+    box-shadow: none !important;
+    border-color: #d0d0d0 !important;
+    transform: none !important;
+  }
+}
