@@ -3,13 +3,17 @@ import CustomerApp from './components/CustomerApp'
 import CafeApp from './components/CafeApp'
 import logoImg from '@/imports/image.png_202607281008.jpeg'
 import Icon from '@/ui/Icon'
+import useIsDesktop from '@/ui/useIsDesktop'
 
 type AppView = 'home' | 'customer' | 'cafe'
 
 const SHELL_BG = { dark: '#0C0B0A', light: '#F5F2EC' }
 
-// On phones this fills the screen; on wide screens it becomes a centred phone-width column
+// Fills the screen; between phone and desktop widths it becomes a centred phone-width column
 function MobileAppShell({ children, theme }: { children: React.ReactNode; theme: 'dark' | 'light' }) {
+  const desktop = useIsDesktop()
+  if (desktop) return <div style={{ height: '100dvh', overflow: 'hidden', background: SHELL_BG[theme] }}>{children}</div>
+
   return (
     <div style={{ minHeight: '100dvh', background: theme === 'dark' ? '#050504' : '#E9E4DB' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', height: '100dvh', overflow: 'hidden', position: 'relative', background: SHELL_BG[theme], boxShadow: '0 0 80px rgba(0,0,0,0.25)' }}>
