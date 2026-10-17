@@ -27,6 +27,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Android
+apk/
 android/.gradle/
 android/app/build/
 android/build/

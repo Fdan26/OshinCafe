@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import logoImg from '@/imports/image.png_202607281008.jpeg'
+import PromoTicket, { PROMO_THEMES } from './PromoTicket'
+import Icon, { type IconName } from '@/ui/Icon'
+import { daysLeft, isExpired, isLive, newPromoCode, toISODate, usePromotions, type Promotion, type PromoTheme } from '@/data/promotions'
 
-type CafeTab = 'dashboard' | 'orders' | 'reservations' | 'menu'
+type CafeTab = 'dashboard' | 'orders' | 'reservations' | 'promos' | 'menu'
 type OrderStatus = 'preparing' | 'ready' | 'completed' | 'cancelled'
 
 interface Order {
@@ -26,60 +29,50 @@ interface Reservation {
 }
 
 const L = {
-  brand: '#F5B800',
-  brandDim: 'rgba(245,184,0,0.12)',
-  bg: '#FAF8F3',
+  bg: '#F5F2EC',
   surface: '#FFFFFF',
-  card: '#FFFFFF',
-  border: '#EBEBEB',
-  muted: '#9A9A9A',
-  mutedDark: '#666666',
-  text: '#1A1A1A',
-  textLight: '#444444',
-  green: '#16A34A',
-  greenBg: 'rgba(22,163,74,0.1)',
-  red: '#DC2626',
-  redBg: 'rgba(220,38,38,0.1)',
-  amber: '#D97706',
-  amberBg: 'rgba(217,119,6,0.1)',
-  blue: '#2563EB',
-  blueBg: 'rgba(37,99,235,0.1)',
+  sunken: '#EFEBE3',
+  line: '#E8E2D8',
+  lineStrong: '#D8D0C3',
+  text: '#1C1915',
+  dim: '#6F675C',
+  faint: '#A39B8F',
+  gold: '#B8892B',
+  goldSoft: 'rgba(184,137,43,0.1)',
+  ink: '#1C1915',
+  ivory: '#F6EFE4',
+  green: '#3E7B57',
+  greenBg: 'rgba(62,123,87,0.1)',
+  amber: '#B4761C',
+  amberBg: 'rgba(180,118,28,0.1)',
+  red: '#B5483A',
+  redBg: 'rgba(181,72,58,0.08)',
+  blue: '#3B5B85',
+  blueBg: 'rgba(59,91,133,0.09)',
 }
 
+const F = { display: 'var(--font-display)', ui: 'var(--font-ui)', mono: 'var(--font-mono)' }
+
+const eyebrow: CSSProperties = { fontFamily: F.ui, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: L.faint }
+const heading: CSSProperties = { fontFamily: F.display, fontWeight: 500, fontSize: 30, letterSpacing: '-0.025em', lineHeight: 1.05, color: L.text, margin: 0 }
+const card: CSSProperties = { background: L.surface, borderRadius: 20, border: `1px solid ${L.line}`, boxShadow: '0 1px 2px rgba(28,25,21,0.04)' }
+
 const INITIAL_ORDERS: Order[] = [
-  {
-    id: 1042, customer: 'Ahmad R.', items: [{ name: 'Signature Latte', qty: 1, price: 14 }, { name: 'Butter Croissant', qty: 2, price: 8 }],
-    table: 'T4', type: 'dine', status: 'preparing', time: '10:32 AM', total: 30,
-  },
-  {
-    id: 1043, customer: 'Sarah L.', items: [{ name: 'Vanilla Cold Brew', qty: 2, price: 16 }, { name: 'Tiramisu', qty: 1, price: 14 }],
-    table: 'Takeaway', type: 'takeaway', status: 'ready', time: '10:28 AM', total: 46,
-  },
-  {
-    id: 1044, customer: 'Reza M.', items: [{ name: 'Oshin Special', qty: 1, price: 17 }, { name: 'Avocado Toast', qty: 1, price: 18 }],
-    table: 'T7', type: 'dine', status: 'preparing', time: '10:41 AM', total: 35,
-  },
-  {
-    id: 1041, customer: 'Priya K.', items: [{ name: 'Iced Matcha Latte', qty: 1, price: 14 }],
-    table: 'T2', type: 'dine', status: 'completed', time: '10:15 AM', total: 14,
-  },
-  {
-    id: 1040, customer: 'Lee W.', items: [{ name: 'Caramel Macchiato', qty: 2, price: 15 }, { name: 'Banana Cake', qty: 2, price: 9 }],
-    table: 'Takeaway', type: 'takeaway', status: 'completed', time: '10:05 AM', total: 48,
-  },
-  {
-    id: 1039, customer: 'Hafiz A.', items: [{ name: 'Club Sandwich', qty: 1, price: 20 }, { name: 'Flat White', qty: 1, price: 13 }],
-    table: 'T1', type: 'dine', status: 'completed', time: '9:52 AM', total: 33,
-  },
+  { id: 1042, customer: 'Ahmad R.', items: [{ name: 'Signature Latte', qty: 1, price: 14 }, { name: 'Butter Croissant', qty: 2, price: 8 }], table: 'T4', type: 'dine', status: 'preparing', time: '10:32', total: 30 },
+  { id: 1043, customer: 'Sarah L.', items: [{ name: 'Vanilla Cold Brew', qty: 2, price: 16 }, { name: 'Tiramisu', qty: 1, price: 14 }], table: 'Pick-up', type: 'takeaway', status: 'ready', time: '10:28', total: 46 },
+  { id: 1044, customer: 'Reza M.', items: [{ name: 'Oshin Special', qty: 1, price: 17 }, { name: 'Avocado Toast', qty: 1, price: 18 }], table: 'T7', type: 'dine', status: 'preparing', time: '10:41', total: 35 },
+  { id: 1041, customer: 'Priya K.', items: [{ name: 'Iced Matcha Latte', qty: 1, price: 14 }], table: 'T2', type: 'dine', status: 'completed', time: '10:15', total: 14 },
+  { id: 1040, customer: 'Lee W.', items: [{ name: 'Caramel Macchiato', qty: 2, price: 15 }, { name: 'Banana Cake', qty: 2, price: 9 }], table: 'Pick-up', type: 'takeaway', status: 'completed', time: '10:05', total: 48 },
+  { id: 1039, customer: 'Hafiz A.', items: [{ name: 'Club Sandwich', qty: 1, price: 20 }, { name: 'Flat White', qty: 1, price: 13 }], table: 'T1', type: 'dine', status: 'completed', time: '09:52', total: 33 },
 ]
 
 const INITIAL_RESERVATIONS: Reservation[] = [
-  { id: 1, name: 'Ahmad Rizwan', pax: 4, time: '12:30 PM', status: 'confirmed', note: 'Anniversary dinner, need cake', phone: '012-345 6789' },
-  { id: 2, name: 'Sarah & Friends', pax: 6, time: '1:00 PM', status: 'seated', phone: '011-234 5678' },
-  { id: 3, name: 'Priya Kumar', pax: 2, time: '2:00 PM', status: 'confirmed', note: 'Window seat preferred', phone: '019-876 5432' },
-  { id: 4, name: 'The Tan Family', pax: 5, time: '7:00 PM', status: 'pending', phone: '017-654 3210' },
-  { id: 5, name: 'Reza & Colleagues', pax: 8, time: '7:30 PM', status: 'confirmed', note: 'Corporate lunch, need invoice', phone: '016-543 2109' },
-  { id: 6, name: 'Lee Mei Ling', pax: 3, time: '8:00 PM', status: 'pending', phone: '013-210 9876' },
+  { id: 1, name: 'Ahmad Rizwan', pax: 4, time: '12:30', status: 'confirmed', note: 'Anniversary dinner, need cake', phone: '012-345 6789' },
+  { id: 2, name: 'Sarah & Friends', pax: 6, time: '13:00', status: 'seated', phone: '011-234 5678' },
+  { id: 3, name: 'Priya Kumar', pax: 2, time: '14:00', status: 'confirmed', note: 'Window seat preferred', phone: '019-876 5432' },
+  { id: 4, name: 'The Tan Family', pax: 5, time: '19:00', status: 'pending', phone: '017-654 3210' },
+  { id: 5, name: 'Reza & Colleagues', pax: 8, time: '19:30', status: 'confirmed', note: 'Corporate lunch, need invoice', phone: '016-543 2109' },
+  { id: 6, name: 'Lee Mei Ling', pax: 3, time: '20:00', status: 'pending', phone: '013-210 9876' },
 ]
 
 const MENU_ITEMS = [
@@ -100,269 +93,327 @@ const MENU_ITEMS = [
   { id: 15, name: 'Burnt Cheesecake', cat: 'Desserts', price: 13, available: true },
 ]
 
+const ORDER_STATUS: Record<OrderStatus, { label: string; color: string; bg: string }> = {
+  preparing: { label: 'Preparing', color: L.amber, bg: L.amberBg },
+  ready: { label: 'Ready', color: L.green, bg: L.greenBg },
+  completed: { label: 'Completed', color: L.dim, bg: L.sunken },
+  cancelled: { label: 'Cancelled', color: L.red, bg: L.redBg },
+}
+
+const ORDER_TYPE: Record<Order['type'], { label: string; icon: IconName }> = {
+  dine: { label: 'Dine-in', icon: 'dine' },
+  takeaway: { label: 'Pick-up', icon: 'takeaway' },
+  delivery: { label: 'Delivery', icon: 'delivery' },
+}
+
+const todayLabel = () => new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
 export default function CafeApp() {
   const [tab, setTab] = useState<CafeTab>('dashboard')
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS)
   const [reservations, setReservations] = useState<Reservation[]>(INITIAL_RESERVATIONS)
   const [menu, setMenu] = useState(MENU_ITEMS)
+  const promotions = usePromotions()
 
   const activeOrders = orders.filter(o => o.status === 'preparing' || o.status === 'ready').length
   const todayRevenue = orders.filter(o => o.status === 'completed').reduce((s, o) => s + o.total, 0)
   const completedToday = orders.filter(o => o.status === 'completed').length
 
-  const updateOrderStatus = (id: number, status: OrderStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
+  const updateOrderStatus = (id: number, status: OrderStatus) => setOrders(prev => prev.map(o => (o.id === id ? { ...o, status } : o)))
+  const updateResStatus = (id: number, status: Reservation['status']) => setReservations(prev => prev.map(r => (r.id === id ? { ...r, status } : r)))
+  const addWalkIn = (name: string, pax: number) => {
+    const now = new Date()
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    setReservations(prev => [{ id: Date.now(), name, pax, time, status: 'seated', phone: 'Walk-in' }, ...prev])
   }
+  const toggleMenuItem = (id: number) => setMenu(prev => prev.map(m => (m.id === id ? { ...m, available: !m.available } : m)))
 
-  const updateResStatus = (id: number, status: Reservation['status']) => {
-    setReservations(prev => prev.map(r => r.id === id ? { ...r, status } : r))
-  }
-
-  const toggleMenuItem = (id: number) => {
-    setMenu(prev => prev.map(m => m.id === id ? { ...m, available: !m.available } : m))
-  }
-
-  const navItems: { id: CafeTab; icon: string; label: string; badge?: number }[] = [
-    { id: 'dashboard', icon: '▦', label: 'Dashboard' },
-    { id: 'orders', icon: '◷', label: 'Orders', badge: activeOrders },
-    { id: 'reservations', icon: '◻', label: 'Bookings' },
-    { id: 'menu', icon: '≡', label: 'Menu' },
+  const navItems: { id: CafeTab; icon: IconName; label: string; badge?: number }[] = [
+    { id: 'dashboard', icon: 'dashboard', label: 'Today' },
+    { id: 'orders', icon: 'receipt', label: 'Orders', badge: activeOrders },
+    { id: 'reservations', icon: 'calendar', label: 'Bookings' },
+    { id: 'promos', icon: 'offers', label: 'Promos' },
+    { id: 'menu', icon: 'list', label: 'Menu' },
   ]
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: L.bg, color: L.text, fontFamily: "'Work Sans', sans-serif" }}>
-      <div className="no-scroll" style={{ flex: 1, overflowY: 'auto' }}>
-        {tab === 'dashboard' && <DashboardScreen orders={orders} revenue={todayRevenue} completed={completedToday} active={activeOrders} onUpdateOrder={updateOrderStatus} goTab={(t) => setTab(t as CafeTab)} />}
-        {tab === 'orders' && <OrdersScreen orders={orders} onUpdate={updateOrderStatus} />}
-        {tab === 'reservations' && <ReservationsScreen reservations={reservations} onUpdate={updateResStatus} />}
-        {tab === 'menu' && <MenuMgmtScreen items={menu} onToggle={toggleMenuItem} />}
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: L.bg, color: L.text, fontFamily: F.ui, position: 'relative' }}>
+      {/* Keyed by tab so each screen opens scrolled to the top */}
+      <div key={tab} className="no-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+        <div className="screen">
+          {tab === 'dashboard' && <DashboardScreen orders={orders} revenue={todayRevenue} completed={completedToday} active={activeOrders} bookings={reservations.filter(r => r.status !== 'cancelled').length} onUpdateOrder={updateOrderStatus} goTab={setTab} />}
+          {tab === 'orders' && <OrdersScreen orders={orders} onUpdate={updateOrderStatus} />}
+          {tab === 'reservations' && <ReservationsScreen reservations={reservations} onUpdate={updateResStatus} onWalkIn={addWalkIn} />}
+          {tab === 'promos' && <PromosScreen {...promotions} />}
+          {tab === 'menu' && <MenuMgmtScreen items={menu} onToggle={toggleMenuItem} />}
+        </div>
       </div>
 
-      {/* Bottom nav */}
-      <div style={{ display: 'flex', background: L.surface, borderTop: `1px solid ${L.border}`, paddingBottom: 20, flexShrink: 0 }}>
-        {navItems.map(({ id, icon, label, badge }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              padding: '10px 0 2px', border: 'none', background: 'transparent', cursor: 'pointer',
-            }}
-          >
-            <div style={{ position: 'relative' }}>
-              <span style={{ fontSize: 18, color: tab === id ? L.brand : L.muted, lineHeight: 1 }}>{icon}</span>
-              {badge ? (
-                <div style={{ position: 'absolute', top: -5, right: -8, background: L.red, color: '#fff', fontSize: 9, fontWeight: 800, borderRadius: 100, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Nunito'" }}>
-                  {badge}
-                </div>
-              ) : null}
-            </div>
-            <span style={{ fontSize: 10, color: tab === id ? L.brand : L.muted, fontWeight: tab === id ? 700 : 400, fontFamily: "'Nunito'" }}>{label}</span>
-            {tab === id && <div style={{ width: 16, height: 2, borderRadius: 2, background: L.brand, marginTop: 1 }} />}
-          </button>
-        ))}
-      </div>
+      <nav style={{ display: 'flex', background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(20px) saturate(160%)', WebkitBackdropFilter: 'blur(20px) saturate(160%)', borderTop: `1px solid ${L.line}`, paddingBottom: 'calc(var(--safe-bottom) + 10px)', flexShrink: 0 }}>
+        {navItems.map(({ id, icon, label, badge }) => {
+          const active = tab === id
+          return (
+            <button key={id} className="tap" onClick={() => setTab(id)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '12px 0 2px', border: 'none', background: 'transparent', cursor: 'pointer', color: active ? L.text : L.faint, position: 'relative' }}>
+              {active && <span style={{ position: 'absolute', top: 0, width: 20, height: 2, borderRadius: 2, background: L.gold }} />}
+              <span style={{ position: 'relative' }}>
+                <Icon name={icon} size={22} stroke={active ? 1.8 : 1.5} />
+                {badge ? <span className="num" style={{ position: 'absolute', top: -5, right: -9, minWidth: 17, height: 17, padding: '0 4px', boxSizing: 'border-box', borderRadius: 99, background: L.red, color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{badge}</span> : null}
+              </span>
+              <span style={{ fontSize: 10.5, fontWeight: active ? 700 : 600, letterSpacing: '0.02em' }}>{label}</span>
+            </button>
+          )
+        })}
+      </nav>
     </div>
+  )
+}
+
+/* ─── SHARED PIECES ─────────────────────────────────────────── */
+function Header({ kicker, title, right, children }: { kicker: string; title: string; right?: ReactNode; children?: ReactNode }) {
+  return (
+    <div style={{ padding: 'calc(var(--safe-top) + 22px) 20px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ ...eyebrow, marginBottom: 8 }}>{kicker}</div>
+          <h1 style={heading}>{title}</h1>
+        </div>
+        {right}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: bg, color, fontSize: 11, fontWeight: 700, letterSpacing: '0.02em', flexShrink: 0 }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+      {label}
+    </span>
+  )
+}
+
+function Chip({ icon, children }: { icon?: IconName; children: ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 10, background: L.sunken, color: L.dim, fontSize: 12, fontWeight: 600 }}>
+      {icon && <Icon name={icon} size={14} />}
+      {children}
+    </span>
+  )
+}
+
+function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string; count?: number }[]; onChange: (v: T) => void }) {
+  return (
+    <div className="no-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', marginTop: 18 }}>
+      {options.map(o => {
+        const active = value === o.id
+        return (
+          <button key={o.id} className="tap" onClick={() => onChange(o.id)} style={{ flexShrink: 0, height: 38, padding: '0 16px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${active ? L.ink : L.line}`, background: active ? L.ink : L.surface, color: active ? L.ivory : L.dim, fontWeight: 700, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {o.label}
+            {o.count !== undefined && <span className="num" style={{ opacity: 0.55 }}>{o.count}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function Switch({ on, onChange }: { on: boolean; onChange: () => void }) {
+  return (
+    <button role="switch" aria-checked={on} onClick={onChange} style={{ width: 44, height: 26, borderRadius: 99, border: 'none', padding: 0, background: on ? L.green : L.lineStrong, cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+      <span style={{ position: 'absolute', top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.22s cubic-bezier(0.2,0.8,0.2,1)', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+    </button>
+  )
+}
+
+function InkButton({ children, onClick, tone = 'ink', grow, disabled }: { children: ReactNode; onClick: () => void; tone?: 'ink' | 'gold' | 'green'; grow?: boolean; disabled?: boolean }) {
+  const bg = disabled ? L.lineStrong : tone === 'gold' ? L.gold : tone === 'green' ? L.green : L.ink
+  return (
+    <button className="tap" disabled={disabled} onClick={onClick} style={{ flex: grow ? 1 : undefined, height: 44, padding: '0 18px', borderRadius: 14, border: 'none', background: bg, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      {children}
+    </button>
+  )
+}
+
+function OutlineIconButton({ icon, onClick, label, tone }: { icon: IconName; onClick: () => void; label: string; tone?: 'red' }) {
+  return (
+    <button className="tap" onClick={onClick} aria-label={label} style={{ width: 44, height: 44, borderRadius: 14, border: `1px solid ${tone === 'red' ? 'rgba(181,72,58,0.25)' : L.line}`, background: L.surface, color: tone === 'red' ? L.red : L.dim, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+      <Icon name={icon} size={18} />
+    </button>
   )
 }
 
 /* ─── DASHBOARD ─────────────────────────────────────────────── */
-function DashboardScreen({ orders, revenue, completed, active, onUpdateOrder, goTab }: {
+function DashboardScreen({ orders, revenue, completed, active, bookings, onUpdateOrder, goTab }: {
   orders: Order[]
   revenue: number
   completed: number
   active: number
+  bookings: number
   onUpdateOrder: (id: number, s: OrderStatus) => void
-  goTab: (t: string) => void
+  goTab: (t: CafeTab) => void
 }) {
   const liveOrders = orders.filter(o => o.status === 'preparing' || o.status === 'ready')
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const hourly = [12, 28, 46, 38, 62, 54, 30, 44] // mock trading curve, 08:00–15:00
+  const peak = Math.max(...hourly)
 
   return (
-    <div style={{ background: L.bg, minHeight: '100%', paddingBottom: 16 }}>
-      {/* Header */}
-      <div style={{ background: L.surface, padding: '16px 20px 16px', borderBottom: `1px solid ${L.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-          <div>
-            <div style={{ fontFamily: "'Nunito'", fontWeight: 900, fontSize: 20, color: L.text }}>Good morning! ☀️</div>
-            <div style={{ fontSize: 12, color: L.muted }}>Tuesday, 29 July 2025</div>
+    <div style={{ paddingBottom: 28 }}>
+      <Header kicker={todayLabel()} title={greeting} right={<img src={logoImg} alt="Oshin Cafe" style={{ width: 44, height: 44, borderRadius: '50%', border: `1px solid ${L.line}`, padding: 2, boxSizing: 'border-box', background: L.surface }} />} />
+
+      <div style={{ padding: '0 20px' }}>
+        {/* Revenue */}
+        <div style={{ borderRadius: 24, padding: '22px 22px 18px', background: 'linear-gradient(150deg, #2A241D 0%, #1C1915 60%)', color: L.ivory, boxShadow: '0 24px 48px -28px rgba(28,25,21,0.7)', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ ...eyebrow, color: 'rgba(246,239,228,0.5)' }}>Revenue today</div>
+              <div className="num" style={{ fontFamily: F.display, fontSize: 44, fontWeight: 400, letterSpacing: '-0.03em', lineHeight: 1, marginTop: 10 }}>
+                <span style={{ fontSize: 20, marginRight: 4, opacity: 0.6 }}>RM</span>{revenue.toFixed(2)}
+              </div>
+              <div className="num" style={{ fontSize: 12.5, color: 'rgba(246,239,228,0.6)', marginTop: 8 }}>{completed} orders completed</div>
+            </div>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px', borderRadius: 99, background: 'rgba(140,192,150,0.14)', color: '#8CC096', fontSize: 11.5, fontWeight: 700 }}>
+              <Icon name="up" size={12} stroke={2.2} /> 12%
+            </span>
           </div>
-          <img src={logoImg} alt="Oshin Cafe" style={{ width: 40, height: 40, borderRadius: '50%', border: `2px solid ${L.brand}` }} />
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 56, marginTop: 20 }}>
+            {hourly.map((v, i) => (
+              <div key={i} style={{ flex: 1, height: `${(v / peak) * 100}%`, borderRadius: 4, background: i === hourly.length - 1 ? '#E2B24F' : 'rgba(246,239,228,0.14)' }} />
+            ))}
+          </div>
+          <div className="num" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: 'rgba(246,239,228,0.4)', marginTop: 8 }}>
+            <span>08:00</span><span>Now</span>
+          </div>
         </div>
-      </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '16px 16px 0' }}>
-        {[
-          { label: "Today's Revenue", value: `RM ${revenue}`, sub: `${completed} orders`, icon: '💰', color: L.greenBg, textColor: L.green },
-          { label: 'Active Orders', value: active.toString(), sub: 'In queue', icon: '🔥', color: 'rgba(245,184,0,0.12)', textColor: L.amber },
-          { label: 'Tables Active', value: '6', sub: 'of 12 tables', icon: '🪑', color: L.blueBg, textColor: L.blue },
-        ].map(({ label, value, sub, icon, color, textColor }) => (
-          <div key={label} style={{ background: L.surface, borderRadius: 16, padding: '14px 12px', border: `1px solid ${L.border}` }}>
-            <div style={{ width: 32, height: 32, borderRadius: 10, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 8 }}>{icon}</div>
-            <div style={{ fontFamily: "'Nunito'", fontWeight: 900, fontSize: 18, color: textColor, lineHeight: 1, marginBottom: 2 }}>{value}</div>
-            <div style={{ fontSize: 9, color: L.muted, lineHeight: 1.3 }}>{label}</div>
-            <div style={{ fontSize: 9, color: L.muted }}>{sub}</div>
-          </div>
-        ))}
-      </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 30 }}>
+          {([
+            { label: 'Active orders', value: active, icon: 'receipt', tab: 'orders' },
+            { label: 'Bookings today', value: bookings, icon: 'calendar', tab: 'reservations' },
+          ] as const).map(s => (
+            <button key={s.label} className="tap" onClick={() => goTab(s.tab)} style={{ ...card, padding: 18, textAlign: 'left', cursor: 'pointer', color: L.text }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: L.faint }}>
+                <Icon name={s.icon} size={18} />
+                <Icon name="arrowRight" size={15} />
+              </div>
+              <div className="num" style={{ fontFamily: F.display, fontSize: 34, letterSpacing: '-0.03em', lineHeight: 1, marginTop: 18 }}>{s.value}</div>
+              <div style={{ fontSize: 12.5, color: L.dim, marginTop: 6 }}>{s.label}</div>
+            </button>
+          ))}
+        </div>
 
-      {/* Live Orders */}
-      <div style={{ padding: '20px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: "'Nunito'", fontWeight: 800, fontSize: 15, color: L.text }}>Live Orders</span>
-        <span onClick={() => goTab('orders')} style={{ fontSize: 12, color: L.brand, cursor: 'pointer', fontFamily: "'Nunito'", fontWeight: 700 }}>View all →</span>
-      </div>
-      <div style={{ padding: '0 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+          <h2 style={{ fontFamily: F.display, fontWeight: 500, fontSize: 22, letterSpacing: '-0.02em', margin: 0 }}>Live orders</h2>
+          <button className="tap" onClick={() => goTab('orders')} style={{ background: 'none', border: 'none', color: L.dim, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>All orders <Icon name="arrowRight" size={14} /></button>
+        </div>
         {liveOrders.length === 0 ? (
-          <div style={{ background: L.surface, borderRadius: 14, padding: '20px', textAlign: 'center', color: L.muted, fontSize: 13 }}>No active orders right now</div>
-        ) : liveOrders.map(order => (
-          <MiniOrderCard key={order.id} order={order} onUpdate={onUpdateOrder} />
-        ))}
-      </div>
-
-      {/* Quick actions */}
-      <div style={{ padding: '20px 16px 0px', fontFamily: "'Nunito'", fontWeight: 800, fontSize: 15, color: L.text, marginBottom: 12 }}>Quick Actions</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px' }}>
-        {[
-          { icon: '➕', label: 'New Walk-in', color: L.greenBg, textColor: L.green },
-          { icon: '📋', label: 'Print Report', color: L.blueBg, textColor: L.blue },
-          { icon: '🔔', label: 'Notify Ready', color: 'rgba(245,184,0,0.12)', textColor: L.amber },
-          { icon: '📊', label: 'Daily Summary', color: 'rgba(139,92,246,0.1)', textColor: '#7C3AED' },
-        ].map(({ icon, label, color, textColor }) => (
-          <div key={label} style={{ background: L.surface, borderRadius: 14, padding: '16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', border: `1px solid ${L.border}` }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</div>
-            <span style={{ fontFamily: "'Nunito'", fontWeight: 700, fontSize: 13, color: L.text }}>{label}</span>
+          <div style={{ ...card, padding: 28, textAlign: 'center', color: L.dim, fontSize: 13.5 }}>The pass is clear. Nicely done.</div>
+        ) : (
+          <div style={{ ...card, padding: '4px 16px' }}>
+            {liveOrders.map((o, i) => {
+              const st = ORDER_STATUS[o.status]
+              return (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: i < liveOrders.length - 1 ? `1px solid ${L.line}` : 'none' }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 14, background: L.sunken, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: F.display, fontSize: 15, flexShrink: 0 }}>{o.table.startsWith('T') ? o.table : <Icon name="takeaway" size={18} color={L.dim} />}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="num" style={{ fontWeight: 800, fontSize: 14 }}>#{o.id}</span>
+                      <span style={{ fontSize: 12.5, color: L.dim }}>{o.customer}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: L.faint, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.items.map(i => `${i.qty}× ${i.name}`).join(' · ')}</div>
+                  </div>
+                  {o.status === 'preparing' ? (
+                    <button className="tap" onClick={() => onUpdateOrder(o.id, 'ready')} style={{ height: 34, padding: '0 12px', borderRadius: 11, border: 'none', background: L.ink, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Mark ready</button>
+                  ) : (
+                    <Pill {...st} />
+                  )}
+                </div>
+              )
+            })}
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function MiniOrderCard({ order, onUpdate }: { order: Order; onUpdate: (id: number, s: OrderStatus) => void }) {
-  const statusConfig: Record<OrderStatus, { label: string; color: string; bg: string }> = {
-    preparing: { label: 'Preparing', color: L.amber, bg: L.amberBg },
-    ready: { label: 'Ready', color: L.green, bg: L.greenBg },
-    completed: { label: 'Completed', color: L.muted, bg: '#F5F5F5' },
-    cancelled: { label: 'Cancelled', color: L.red, bg: L.redBg },
-  }
-  const sc = statusConfig[order.status]
-
-  return (
-    <div style={{ background: L.surface, borderRadius: 14, padding: '14px', marginBottom: 10, border: `1px solid ${L.border}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: "'Nunito'", fontWeight: 800, fontSize: 14, color: L.text }}>#{order.id}</span>
-          <span style={{ fontSize: 11, color: L.muted }}>· {order.customer}</span>
-        </div>
-        <div style={{ background: sc.bg, color: sc.color, fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 100, fontFamily: "'Nunito'" }}>{sc.label}</div>
-      </div>
-      <div style={{ fontSize: 12, color: L.textLight, marginBottom: 8 }}>
-        {order.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <span style={{ fontSize: 11, background: L.bg, padding: '3px 8px', borderRadius: 6, color: L.mutedDark, fontFamily: "'Nunito'", fontWeight: 600 }}>{order.table}</span>
-          <span style={{ fontSize: 11, color: L.muted }}>{order.time}</span>
-        </div>
-        {order.status === 'preparing' && (
-          <button onClick={() => onUpdate(order.id, 'ready')} style={{ background: L.green, color: '#fff', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 11, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>Mark Ready</button>
         )}
-        {order.status === 'ready' && (
-          <button onClick={() => onUpdate(order.id, 'completed')} style={{ background: L.brand, color: '#000', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 11, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>Complete</button>
-        )}
-      </div>
-    </div>
-  )
-}
 
-/* ─── ORDERS SCREEN ──────────────────────────────────────────── */
-function OrdersScreen({ orders, onUpdate }: { orders: Order[]; onUpdate: (id: number, s: OrderStatus) => void }) {
-  const [filter, setFilter] = useState<'all' | OrderStatus>('all')
-  const filters: { id: 'all' | OrderStatus; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'preparing', label: 'Preparing' },
-    { id: 'ready', label: 'Ready' },
-    { id: 'completed', label: 'Done' },
-  ]
-  const shown = filter === 'all' ? orders : orders.filter(o => o.status === filter)
-
-  const statusConfig: Record<OrderStatus, { label: string; color: string; bg: string }> = {
-    preparing: { label: 'Preparing', color: L.amber, bg: L.amberBg },
-    ready: { label: 'Ready ✓', color: L.green, bg: L.greenBg },
-    completed: { label: 'Completed', color: L.muted, bg: '#F5F5F5' },
-    cancelled: { label: 'Cancelled', color: L.red, bg: L.redBg },
-  }
-
-  return (
-    <div style={{ background: L.bg, minHeight: '100%' }}>
-      <div style={{ background: L.surface, padding: '16px 16px 0', borderBottom: `1px solid ${L.border}` }}>
-        <div style={{ fontFamily: "'Nunito'", fontWeight: 900, fontSize: 20, color: L.text, marginBottom: 12 }}>Live Orders</div>
-        <div className="no-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12 }}>
-          {filters.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setFilter(id)}
-              style={{
-                flexShrink: 0, padding: '8px 16px', borderRadius: 100, border: 'none', cursor: 'pointer',
-                background: filter === id ? L.brand : L.bg,
-                color: filter === id ? '#000' : L.mutedDark,
-                fontFamily: "'Nunito'", fontWeight: 700, fontSize: 12,
-                transition: 'all 0.15s',
-              }}
-            >
-              {label} {id !== 'all' && <span style={{ opacity: 0.7 }}>({orders.filter(o => o.status === id).length})</span>}
+        <h2 style={{ fontFamily: F.display, fontWeight: 500, fontSize: 22, letterSpacing: '-0.02em', margin: '30px 0 14px' }}>Shortcuts</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {([
+            { icon: 'walkIn', label: 'New walk-in', tab: 'reservations' },
+            { icon: 'offers', label: 'Create promo', tab: 'promos' },
+            { icon: 'list', label: 'Sold-out items', tab: 'menu' },
+            { icon: 'chart', label: 'Daily summary', tab: 'dashboard' },
+          ] as const).map(a => (
+            <button key={a.label} className="tap" onClick={() => goTab(a.tab)} style={{ ...card, padding: '16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', color: L.text, textAlign: 'left' }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, background: L.goldSoft, color: L.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name={a.icon} size={18} /></span>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{a.label}</span>
             </button>
           ))}
         </div>
       </div>
+    </div>
+  )
+}
 
-      <div style={{ padding: '12px 16px' }}>
+/* ─── ORDERS ────────────────────────────────────────────────── */
+function OrdersScreen({ orders, onUpdate }: { orders: Order[]; onUpdate: (id: number, s: OrderStatus) => void }) {
+  const [filter, setFilter] = useState<'all' | OrderStatus>('all')
+  const shown = filter === 'all' ? orders : orders.filter(o => o.status === filter)
+  const count = (s: OrderStatus) => orders.filter(o => o.status === s).length
+
+  return (
+    <div style={{ paddingBottom: 28 }}>
+      <Header kicker="Live service" title="Orders">
+        <Segmented
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { id: 'all', label: 'All', count: orders.length },
+            { id: 'preparing', label: 'Preparing', count: count('preparing') },
+            { id: 'ready', label: 'Ready', count: count('ready') },
+            { id: 'completed', label: 'Done', count: count('completed') },
+          ]}
+        />
+      </Header>
+
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {shown.length === 0 && <div style={{ ...card, padding: 28, textAlign: 'center', color: L.dim, fontSize: 13.5 }}>No orders here.</div>}
         {shown.map(order => {
-          const sc = statusConfig[order.status]
+          const st = ORDER_STATUS[order.status]
+          const type = ORDER_TYPE[order.type]
+          const open = order.status === 'preparing' || order.status === 'ready'
           return (
-            <div key={order.id} style={{ background: L.surface, borderRadius: 16, padding: '16px', marginBottom: 10, border: `1px solid ${L.border}` }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div key={order.id} style={{ ...card, padding: 18, opacity: order.status === 'cancelled' ? 0.6 : 1 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontFamily: "'Nunito'", fontWeight: 800, fontSize: 15, color: L.text }}>Order #{order.id}</div>
-                  <div style={{ fontSize: 12, color: L.muted }}>{order.customer} · {order.time}</div>
+                  <div className="num" style={{ fontFamily: F.display, fontSize: 22, letterSpacing: '-0.02em', lineHeight: 1 }}>#{order.id}</div>
+                  <div className="num" style={{ fontSize: 12.5, color: L.dim, marginTop: 6 }}>{order.customer} · {order.time}</div>
                 </div>
-                <div style={{ background: sc.bg, color: sc.color, fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 100, fontFamily: "'Nunito'", flexShrink: 0 }}>{sc.label}</div>
+                <Pill {...st} />
               </div>
 
               {order.items.map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, color: L.textLight }}>{item.qty}× {item.name}</span>
-                  <span style={{ fontSize: 13, color: L.mutedDark, fontFamily: "'Nunito'", fontWeight: 600 }}>RM {(item.qty * item.price).toFixed(2)}</span>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, marginBottom: 6 }}>
+                  <span><span className="num" style={{ color: L.faint, marginRight: 8 }}>{item.qty}×</span>{item.name}</span>
+                  <span className="num" style={{ color: L.dim }}>{(item.qty * item.price).toFixed(2)}</span>
                 </div>
               ))}
 
-              <div style={{ height: 1, background: L.border, margin: '10px 0' }} />
+              <div style={{ borderTop: `1px dashed ${L.lineStrong}`, margin: '14px 0' }} />
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <span style={{ fontSize: 11, background: L.bg, border: `1px solid ${L.border}`, padding: '3px 8px', borderRadius: 6, color: L.mutedDark, fontFamily: "'Nunito'", fontWeight: 600 }}>{order.table}</span>
-                  <span style={{ fontSize: 11, background: L.bg, border: `1px solid ${L.border}`, padding: '3px 8px', borderRadius: 6, color: L.mutedDark, fontFamily: "'Nunito'", fontWeight: 600 }}>
-                    {order.type === 'dine' ? '🍽 Dine-in' : order.type === 'takeaway' ? '🛍 Takeaway' : '🛵 Delivery'}
-                  </span>
+                  {order.table.startsWith('T') && <Chip icon="table">{order.table}</Chip>}
+                  <Chip icon={type.icon}>{type.label}</Chip>
                 </div>
-                <span style={{ fontFamily: "'Nunito'", fontWeight: 900, fontSize: 15, color: L.brand }}>RM {order.total.toFixed(2)}</span>
+                <span className="num" style={{ fontFamily: F.display, fontSize: 20, letterSpacing: '-0.02em' }}><span style={{ fontSize: 12, color: L.faint, marginRight: 4, fontFamily: F.ui, fontWeight: 600 }}>RM</span>{order.total.toFixed(2)}</span>
               </div>
 
-              {(order.status === 'preparing' || order.status === 'ready') && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  {order.status === 'preparing' && (
-                    <button onClick={() => onUpdate(order.id, 'ready')} style={{ flex: 1, background: L.green, color: '#fff', border: 'none', borderRadius: 10, padding: '10px', fontSize: 13, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>
-                      ✓ Mark Ready
-                    </button>
-                  )}
-                  {order.status === 'ready' && (
-                    <button onClick={() => onUpdate(order.id, 'completed')} style={{ flex: 1, background: L.brand, color: '#000', border: 'none', borderRadius: 10, padding: '10px', fontSize: 13, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>
-                      ✓ Complete Order
-                    </button>
-                  )}
-                  <button onClick={() => onUpdate(order.id, 'cancelled')} style={{ background: L.redBg, color: L.red, border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>
-                    ✕
-                  </button>
+              {open && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  {order.status === 'preparing'
+                    ? <InkButton grow onClick={() => onUpdate(order.id, 'ready')}><Icon name="check" size={16} stroke={2.2} /> Mark ready</InkButton>
+                    : <InkButton grow tone="gold" onClick={() => onUpdate(order.id, 'completed')}><Icon name="check" size={16} stroke={2.2} /> Hand over</InkButton>}
+                  <OutlineIconButton icon="close" tone="red" label="Cancel order" onClick={() => onUpdate(order.id, 'cancelled')} />
                 </div>
               )}
             </div>
@@ -373,75 +424,94 @@ function OrdersScreen({ orders, onUpdate }: { orders: Order[]; onUpdate: (id: nu
   )
 }
 
-/* ─── RESERVATIONS SCREEN ────────────────────────────────────── */
-function ReservationsScreen({ reservations, onUpdate }: {
+/* ─── RESERVATIONS ──────────────────────────────────────────── */
+const RES_STATUS: Record<Reservation['status'], { label: string; color: string; bg: string }> = {
+  confirmed: { label: 'Confirmed', color: L.blue, bg: L.blueBg },
+  seated: { label: 'Seated', color: L.green, bg: L.greenBg },
+  pending: { label: 'Pending', color: L.amber, bg: L.amberBg },
+  cancelled: { label: 'Cancelled', color: L.red, bg: L.redBg },
+}
+
+const fieldLabel: CSSProperties = { ...eyebrow, fontSize: 9.5, marginBottom: 8, color: L.dim }
+const fieldInput: CSSProperties = { width: '100%', height: 46, background: L.bg, border: `1px solid ${L.line}`, borderRadius: 14, padding: '0 14px', fontSize: 14, color: L.text, outline: 'none', boxSizing: 'border-box' }
+
+function ReservationsScreen({ reservations, onUpdate, onWalkIn }: {
   reservations: Reservation[]
   onUpdate: (id: number, status: Reservation['status']) => void
+  onWalkIn: (name: string, pax: number) => void
 }) {
   const [showAdd, setShowAdd] = useState(false)
-  const statusConfig: Record<Reservation['status'], { label: string; color: string; bg: string }> = {
-    confirmed: { label: 'Confirmed', color: L.blue, bg: L.blueBg },
-    seated: { label: 'Seated ✓', color: L.green, bg: L.greenBg },
-    pending: { label: 'Pending', color: L.amber, bg: L.amberBg },
-    cancelled: { label: 'Cancelled', color: L.red, bg: L.redBg },
+  const [name, setName] = useState('')
+  const [pax, setPax] = useState(2)
+  const sorted = [...reservations].sort((a, b) => a.time.localeCompare(b.time))
+  const guests = reservations.filter(r => r.status !== 'cancelled').reduce((s, r) => s + r.pax, 0)
+
+  const submit = () => {
+    if (!name.trim()) return
+    onWalkIn(name.trim(), pax)
+    setName('')
+    setPax(2)
+    setShowAdd(false)
   }
 
   return (
-    <div style={{ background: L.bg, minHeight: '100%' }}>
-      <div style={{ background: L.surface, padding: '16px 16px 16px', borderBottom: `1px solid ${L.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontFamily: "'Nunito'", fontWeight: 900, fontSize: 20, color: L.text }}>Reservations</div>
-          <div style={{ fontSize: 12, color: L.muted }}>Tuesday, 29 July — {reservations.length} bookings</div>
-        </div>
-        <button onClick={() => setShowAdd(true)} style={{ background: L.brand, color: '#000', border: 'none', borderRadius: 100, padding: '8px 16px', fontFamily: "'Nunito'", fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>+ Walk-in</button>
-      </div>
+    <div style={{ paddingBottom: 28 }}>
+      <Header kicker={`${todayLabel()} · ${guests} guests`} title="Bookings" right={<InkButton onClick={() => setShowAdd(!showAdd)}><Icon name={showAdd ? 'close' : 'plus'} size={16} stroke={2} /> Walk-in</InkButton>} />
 
-      {showAdd && (
-        <div style={{ margin: '12px 16px', background: L.surface, borderRadius: 16, padding: '16px', border: `2px solid ${L.brand}` }}>
-          <div style={{ fontFamily: "'Nunito'", fontWeight: 800, fontSize: 14, marginBottom: 12, color: L.text }}>New Walk-in</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 10, color: L.muted, marginBottom: 4, fontFamily: "'Nunito'", fontWeight: 700 }}>NAME</div>
-              <input placeholder="Customer name" style={{ width: '100%', background: L.bg, border: `1px solid ${L.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, color: L.text, outline: 'none', boxSizing: 'border-box', fontFamily: "'Work Sans'" }} />
+      <div style={{ padding: '0 20px' }}>
+        {showAdd && (
+          <div style={{ ...card, padding: 18, marginBottom: 16, border: `1px solid ${L.gold}` }}>
+            <div style={{ fontFamily: F.display, fontSize: 19, marginBottom: 14 }}>Seat a walk-in</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 104px', gap: 10, marginBottom: 14 }}>
+              <div>
+                <div style={fieldLabel}>Name</div>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="Guest name" style={fieldInput} />
+              </div>
+              <div>
+                <div style={fieldLabel}>Guests</div>
+                <input type="number" min={1} max={12} value={pax} onChange={e => setPax(Math.max(1, Math.min(12, Number(e.target.value) || 1)))} style={fieldInput} />
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 10, color: L.muted, marginBottom: 4, fontFamily: "'Nunito'", fontWeight: 700 }}>GUESTS</div>
-              <input placeholder="2" type="number" style={{ width: '100%', background: L.bg, border: `1px solid ${L.border}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, color: L.text, outline: 'none', boxSizing: 'border-box', fontFamily: "'Work Sans'" }} />
-            </div>
+            <InkButton grow disabled={!name.trim()} onClick={submit}><Icon name="check" size={16} stroke={2.2} /> Seat now</InkButton>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setShowAdd(false)} style={{ flex: 1, background: L.green, color: '#fff', border: 'none', borderRadius: 10, padding: '10px', fontSize: 12, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>✓ Add Walkn-in</button>
-            <button onClick={() => setShowAdd(false)} style={{ background: L.bg, color: L.muted, border: `1px solid ${L.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-          </div>
-        </div>
-      )}
+        )}
 
-      <div style={{ padding: '12px 16px' }}>
-        {reservations.map(res => {
-          const sc = statusConfig[res.status]
+        {sorted.map((res, i) => {
+          const st = RES_STATUS[res.status]
+          const open = res.status === 'confirmed' || res.status === 'pending'
           return (
-            <div key={res.id} style={{ background: L.surface, borderRadius: 16, padding: '14px 16px', marginBottom: 10, border: `1px solid ${L.border}` }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div>
-                  <div style={{ fontFamily: "'Nunito'", fontWeight: 800, fontSize: 14, color: L.text }}>{res.name}</div>
-                  <div style={{ fontSize: 12, color: L.muted }}>{res.phone}</div>
-                </div>
-                <div style={{ background: sc.bg, color: sc.color, fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 100, fontFamily: "'Nunito'" }}>{sc.label}</div>
+            <div key={res.id} style={{ display: 'flex', gap: 14 }}>
+              {/* Timeline */}
+              <div style={{ width: 46, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div className="num" style={{ fontFamily: F.display, fontSize: 15, paddingTop: 16 }}>{res.time}</div>
+                <div style={{ flex: 1, width: 1, background: i < sorted.length - 1 ? L.lineStrong : 'transparent', marginTop: 8 }} />
               </div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: res.note ? 8 : 10 }}>
-                <span style={{ fontSize: 11, background: L.bg, border: `1px solid ${L.border}`, padding: '3px 10px', borderRadius: 6, color: L.mutedDark, fontFamily: "'Nunito'", fontWeight: 700 }}>🕐 {res.time}</span>
-                <span style={{ fontSize: 11, background: L.bg, border: `1px solid ${L.border}`, padding: '3px 10px', borderRadius: 6, color: L.mutedDark, fontFamily: "'Nunito'", fontWeight: 700 }}>👥 {res.pax} pax</span>
-              </div>
-              {res.note && <div style={{ fontSize: 11, color: L.muted, marginBottom: 10, background: 'rgba(245,184,0,0.06)', padding: '6px 10px', borderRadius: 8, borderLeft: `3px solid ${L.brand}` }}>📝 {res.note}</div>}
-              {(res.status === 'confirmed' || res.status === 'pending') && (
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {res.status === 'pending' && (
-                    <button onClick={() => onUpdate(res.id, 'confirmed')} style={{ flex: 1, background: L.blueBg, color: L.blue, border: 'none', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>Confirm</button>
-                  )}
-                  <button onClick={() => onUpdate(res.id, 'seated')} style={{ flex: 1, background: L.greenBg, color: L.green, border: 'none', borderRadius: 8, padding: '8px', fontSize: 11, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>Seat Now</button>
-                  <button onClick={() => onUpdate(res.id, 'cancelled')} style={{ background: L.redBg, color: L.red, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontFamily: "'Nunito'", fontWeight: 700, cursor: 'pointer' }}>✕</button>
+              <div style={{ ...card, flex: 1, minWidth: 0, padding: 16, marginBottom: 12, opacity: res.status === 'cancelled' ? 0.55 : 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: F.display, fontSize: 17, letterSpacing: '-0.01em' }}>{res.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, fontSize: 12, color: L.dim }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Icon name="users" size={14} /> {res.pax}</span>
+                      <span className="num" style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Icon name="phone" size={13} /> {res.phone}</span>
+                    </div>
+                  </div>
+                  <Pill {...st} />
                 </div>
-              )}
+                {res.note && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, padding: '10px 12px', borderRadius: 12, background: L.goldSoft, color: '#7A5B1C', fontSize: 12.5, lineHeight: 1.45 }}>
+                    <Icon name="note" size={15} style={{ marginTop: 1 }} /> {res.note}
+                  </div>
+                )}
+                {open && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                    {res.status === 'pending' && (
+                      <button className="tap" onClick={() => onUpdate(res.id, 'confirmed')} style={{ flex: 1, height: 38, borderRadius: 12, border: `1px solid ${L.line}`, background: L.surface, color: L.text, fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Confirm</button>
+                    )}
+                    <button className="tap" onClick={() => onUpdate(res.id, 'seated')} style={{ flex: 1, height: 38, borderRadius: 12, border: 'none', background: L.ink, color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Seat</button>
+                    <button className="tap" onClick={() => onUpdate(res.id, 'cancelled')} aria-label="Cancel booking" style={{ width: 38, height: 38, borderRadius: 12, border: '1px solid rgba(181,72,58,0.25)', background: L.surface, color: L.red, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Icon name="close" size={15} /></button>
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}
@@ -450,7 +520,235 @@ function ReservationsScreen({ reservations, onUpdate }: {
   )
 }
 
-/* ─── MENU MANAGEMENT ────────────────────────────────────────── */
+/* ─── PROMOTIONS ────────────────────────────────────────────── */
+type PromoFilter = 'all' | 'live' | 'paused' | 'ended'
+
+function promoStatus(p: Promotion): Exclude<PromoFilter, 'all'> {
+  if (isExpired(p)) return 'ended'
+  return p.active ? 'live' : 'paused'
+}
+
+const PROMO_STATUS: Record<Exclude<PromoFilter, 'all'>, { label: string; color: string; bg: string }> = {
+  live: { label: 'Live', color: L.green, bg: L.greenBg },
+  paused: { label: 'Paused', color: L.amber, bg: L.amberBg },
+  ended: { label: 'Ended', color: L.dim, bg: L.sunken },
+}
+
+function PromosScreen({ promos, save, remove, toggle }: ReturnType<typeof usePromotions>) {
+  const [filter, setFilter] = useState<PromoFilter>('all')
+  const [editing, setEditing] = useState<Promotion | null>(null)
+
+  const live = promos.filter(isLive)
+  const endingSoon = live.filter(p => daysLeft(p.validUntil) <= 7).length
+  const totalRedeemed = promos.reduce((s, p) => s + p.redemptions, 0)
+  const shown = filter === 'all' ? promos : promos.filter(p => promoStatus(p) === filter)
+  const count = (f: Exclude<PromoFilter, 'all'>) => promos.filter(p => promoStatus(p) === f).length
+
+  const startNew = () => setEditing({
+    id: `p${Date.now()}`, title: '', subtitle: '', code: newPromoCode(), kind: 'percent', value: 10, minSpend: 0,
+    validUntil: toISODate(new Date(Date.now() + 14 * 86_400_000)), theme: 'gold', active: true, redemptions: 0,
+  })
+
+  return (
+    <div style={{ paddingBottom: 28 }}>
+      <Header kicker="Shown in the customer app" title="Promotions" right={<InkButton onClick={startNew}><Icon name="plus" size={16} stroke={2} /> New</InkButton>}>
+        <div style={{ ...card, display: 'grid', gridTemplateColumns: '1fr 1px 1fr 1px 1fr', marginTop: 18 }}>
+          {[
+            { label: 'Live', value: live.length, color: L.green },
+            null,
+            { label: 'Redeemed', value: totalRedeemed, color: L.text },
+            null,
+            { label: 'Ending ≤ 7d', value: endingSoon, color: endingSoon ? L.amber : L.text },
+          ].map((s, i) =>
+            s ? (
+              <div key={i} style={{ padding: '14px 14px 12px' }}>
+                <div className="num" style={{ fontFamily: F.display, fontSize: 26, color: s.color, letterSpacing: '-0.02em', lineHeight: 1 }}>{s.value}</div>
+                <div style={{ ...eyebrow, fontSize: 9, marginTop: 8 }}>{s.label}</div>
+              </div>
+            ) : <div key={i} style={{ background: L.line, margin: '12px 0' }} />,
+          )}
+        </div>
+        <Segmented
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { id: 'all', label: 'All', count: promos.length },
+            { id: 'live', label: 'Live', count: count('live') },
+            { id: 'paused', label: 'Paused', count: count('paused') },
+            { id: 'ended', label: 'Ended', count: count('ended') },
+          ]}
+        />
+      </Header>
+
+      <div style={{ padding: '0 20px' }}>
+        {shown.length === 0 && (
+          <div style={{ ...card, borderStyle: 'dashed', padding: '32px 20px', textAlign: 'center' }}>
+            <div style={{ fontFamily: F.display, fontSize: 19 }}>No promotions here</div>
+            <div style={{ fontSize: 13, color: L.dim, marginTop: 6 }}>Create one and it appears in the customer app instantly.</div>
+          </div>
+        )}
+        {shown.map(p => {
+          const st = PROMO_STATUS[promoStatus(p)]
+          return (
+            <div key={p.id} style={{ ...card, padding: 10, marginBottom: 12 }}>
+              <PromoTicket promo={p} cutout={L.surface} dimmed={!isLive(p)} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 6px 4px' }}>
+                <Pill {...st} />
+                <span className="num" style={{ fontSize: 12, color: L.dim, flex: 1 }}><strong style={{ color: L.text }}>{p.redemptions}</strong> redeemed</span>
+                {!isExpired(p) && <Switch on={p.active} onChange={() => toggle(p.id)} />}
+                <button className="tap" onClick={() => setEditing(p)} aria-label="Edit promotion" style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${L.line}`, background: L.surface, color: L.text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <Icon name="edit" size={16} />
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {editing && (
+        <PromoEditor
+          initial={editing}
+          isNew={!promos.some(p => p.id === editing.id)}
+          takenCodes={promos.filter(p => p.id !== editing.id).map(p => p.code.toUpperCase())}
+          onClose={() => setEditing(null)}
+          onSave={p => { save(p); setEditing(null) }}
+          onDelete={id => { remove(id); setEditing(null) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function PromoEditor({ initial, isNew, takenCodes, onClose, onSave, onDelete }: {
+  initial: Promotion
+  isNew: boolean
+  takenCodes: string[]
+  onClose: () => void
+  onSave: (p: Promotion) => void
+  onDelete: (id: string) => void
+}) {
+  const [draft, setDraft] = useState(initial)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const set = <K extends keyof Promotion>(key: K, value: Promotion[K]) => setDraft(d => ({ ...d, [key]: value }))
+
+  const errors: string[] = []
+  if (!draft.title.trim()) errors.push('Add a title')
+  if (!(draft.value > 0)) errors.push('Discount must be more than 0')
+  if (draft.kind === 'percent' && draft.value > 100) errors.push('Percentage can’t exceed 100')
+  if (draft.minSpend < 0) errors.push('Minimum spend can’t be negative')
+  if (!/^[A-Z0-9]{3,12}$/.test(draft.code)) errors.push('Code: 3–12 letters or numbers')
+  else if (takenCodes.includes(draft.code)) errors.push('That code is already used')
+  if (!draft.validUntil || draft.validUntil < toISODate(new Date())) errors.push('End date must be today or later')
+
+  const num = (v: string) => (v === '' ? 0 : Number(v))
+  const submit = () => errors.length === 0 && onSave({ ...draft, title: draft.title.trim(), subtitle: draft.subtitle.trim() })
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'rgba(28,25,21,0.42)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)' }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="no-scroll sheet" style={{ background: L.surface, borderRadius: '28px 28px 0 0', maxHeight: '92%', overflowY: 'auto', boxShadow: '0 -24px 48px -24px rgba(0,0,0,0.35)' }}>
+        <div style={{ position: 'sticky', top: 0, background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', zIndex: 1, padding: '10px 20px 14px', borderBottom: `1px solid ${L.line}` }}>
+          <div style={{ width: 38, height: 4, borderRadius: 4, background: L.lineStrong, margin: '0 auto 14px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: L.dim, fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Cancel</button>
+            <div style={{ fontFamily: F.display, fontSize: 18 }}>{isNew ? 'New promotion' : 'Edit promotion'}</div>
+            <button onClick={submit} style={{ background: 'none', border: 'none', color: errors.length ? L.faint : L.gold, fontSize: 14, fontWeight: 800, cursor: errors.length ? 'default' : 'pointer', padding: 0 }}>Save</button>
+          </div>
+        </div>
+
+        <div style={{ padding: '18px 20px calc(var(--safe-bottom) + 28px)' }}>
+          <div style={{ background: '#0C0B0A', borderRadius: 22, padding: '14px 12px 14px', marginBottom: 24 }}>
+            <div style={{ ...eyebrow, fontSize: 9, color: 'rgba(246,239,228,0.45)', marginBottom: 12, paddingLeft: 4 }}>Customer preview</div>
+            <PromoTicket promo={draft} cutout="#0C0B0A" />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={fieldLabel}>Title</div>
+            <input value={draft.title} maxLength={28} onChange={e => set('title', e.target.value)} placeholder="e.g. Golden Hour" style={fieldInput} />
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <div style={fieldLabel}>Description</div>
+            <input value={draft.subtitle} maxLength={60} onChange={e => set('subtitle', e.target.value)} placeholder="e.g. Every handcrafted drink, 3–5 PM" style={fieldInput} />
+          </div>
+
+          <div style={fieldLabel}>Discount</div>
+          <div style={{ display: 'flex', background: L.sunken, borderRadius: 14, padding: 4, gap: 4, marginBottom: 12 }}>
+            {([['percent', 'Percentage'], ['fixed', 'Fixed amount']] as const).map(([kind, label]) => {
+              const active = draft.kind === kind
+              return (
+                <button key={kind} className="tap" onClick={() => set('kind', kind)} style={{ flex: 1, height: 38, borderRadius: 11, border: 'none', cursor: 'pointer', background: active ? L.surface : 'transparent', color: active ? L.text : L.dim, boxShadow: active ? '0 1px 3px rgba(28,25,21,0.12)' : 'none', fontWeight: 700, fontSize: 13 }}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+            <div>
+              <div style={fieldLabel}>{draft.kind === 'percent' ? 'Percent off' : 'RM off'}</div>
+              <input type="number" inputMode="decimal" min={0} value={draft.value || ''} onChange={e => set('value', num(e.target.value))} placeholder="10" style={fieldInput} />
+            </div>
+            <div>
+              <div style={fieldLabel}>Min spend (RM)</div>
+              <input type="number" inputMode="decimal" min={0} value={draft.minSpend || ''} onChange={e => set('minSpend', num(e.target.value))} placeholder="None" style={fieldInput} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+            <div>
+              <div style={fieldLabel}>Promo code</div>
+              <div style={{ position: 'relative' }}>
+                <input value={draft.code} maxLength={12} onChange={e => set('code', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} style={{ ...fieldInput, fontFamily: F.mono, letterSpacing: '0.1em', paddingRight: 40 }} />
+                <button onClick={() => set('code', newPromoCode())} aria-label="Generate code" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 32, height: 32, background: 'none', border: 'none', color: L.dim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="refresh" size={16} /></button>
+              </div>
+            </div>
+            <div>
+              <div style={fieldLabel}>Ends on</div>
+              <input type="date" value={draft.validUntil} min={toISODate(new Date())} onChange={e => set('validUntil', e.target.value)} style={fieldInput} />
+            </div>
+          </div>
+
+          <div style={fieldLabel}>Card style</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {(Object.keys(PROMO_THEMES) as PromoTheme[]).map(theme => {
+              const selected = draft.theme === theme
+              return (
+                <button key={theme} className="tap" onClick={() => set('theme', theme)} style={{ flex: 1, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, cursor: 'pointer', background: L.surface, border: `1.5px solid ${selected ? L.ink : L.line}` }}>
+                  <span style={{ width: 18, height: 18, borderRadius: '50%', background: PROMO_THEMES[theme].stub, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontWeight: 700, fontSize: 13, color: L.text }}>{PROMO_THEMES[theme].name}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: L.bg, border: `1px solid ${L.line}`, borderRadius: 16, padding: '14px 16px', marginBottom: 20 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Visible to customers</div>
+              <div style={{ fontSize: 12, color: L.dim, marginTop: 2 }}>Turn off to pause without deleting</div>
+            </div>
+            <Switch on={draft.active} onChange={() => set('active', !draft.active)} />
+          </div>
+
+          {errors.length > 0 && (
+            <div style={{ background: L.amberBg, color: L.amber, borderRadius: 14, padding: '12px 14px', fontSize: 12.5, marginBottom: 16, lineHeight: 1.7 }}>
+              {errors.map(e => <div key={e}>· {e}</div>)}
+            </div>
+          )}
+
+          <button className="tap" disabled={errors.length > 0} onClick={submit} style={{ width: '100%', height: 54, background: errors.length ? L.lineStrong : L.ink, color: '#fff', border: 'none', borderRadius: 16, fontWeight: 800, fontSize: 15, cursor: errors.length ? 'default' : 'pointer' }}>
+            {isNew ? 'Publish promotion' : 'Save changes'}
+          </button>
+
+          {!isNew && (
+            <button className="tap" onClick={() => (confirmDelete ? onDelete(draft.id) : setConfirmDelete(true))} style={{ width: '100%', height: 50, marginTop: 10, background: confirmDelete ? L.red : 'transparent', color: confirmDelete ? '#fff' : L.red, border: `1px solid ${confirmDelete ? L.red : 'rgba(181,72,58,0.25)'}`, borderRadius: 16, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Icon name="trash" size={16} /> {confirmDelete ? 'Tap again to delete' : 'Delete promotion'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── MENU MANAGEMENT ───────────────────────────────────────── */
 function MenuMgmtScreen({ items, onToggle }: { items: typeof MENU_ITEMS; onToggle: (id: number) => void }) {
   const [cat, setCat] = useState('Coffee')
   const cats = ['Coffee', 'Cold', 'Food', 'Desserts']
@@ -458,60 +756,24 @@ function MenuMgmtScreen({ items, onToggle }: { items: typeof MENU_ITEMS; onToggl
   const unavailable = items.filter(i => !i.available).length
 
   return (
-    <div style={{ background: L.bg, minHeight: '100%' }}>
-      <div style={{ background: L.surface, padding: '16px 16px 0', borderBottom: `1px solid ${L.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Nunito'", fontWeight: 900, fontSize: 20, color: L.text }}>Menu Manager</div>
-          {unavailable > 0 && <div style={{ background: L.redBg, color: L.red, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100, fontFamily: "'Nunito'" }}>{unavailable} unavailable</div>}
-        </div>
-        <div className="no-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12 }}>
-          {cats.map(c => (
-            <button
-              key={c}
-              onClick={() => setCat(c)}
-              style={{
-                flexShrink: 0, padding: '8px 16px', borderRadius: 100, border: 'none', cursor: 'pointer',
-                background: cat === c ? L.brand : L.bg,
-                color: cat === c ? '#000' : L.mutedDark,
-                fontFamily: "'Nunito'", fontWeight: 700, fontSize: 12,
-                transition: 'all 0.15s',
-              }}
-            >
-              {c}
-            </button>
+    <div style={{ paddingBottom: 28 }}>
+      <Header kicker="Availability" title="Menu" right={unavailable > 0 ? <Pill label={`${unavailable} sold out`} color={L.red} bg={L.redBg} /> : undefined}>
+        <Segmented value={cat} onChange={setCat} options={cats.map(c => ({ id: c, label: c, count: items.filter(i => i.cat === c).length }))} />
+      </Header>
+
+      <div style={{ padding: '0 20px' }}>
+        <div style={{ ...card, padding: '4px 18px' }}>
+          {shown.map((item, i) => (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 0', borderBottom: i < shown.length - 1 ? `1px solid ${L.line}` : 'none' }}>
+              <div style={{ flex: 1, minWidth: 0, opacity: item.available ? 1 : 0.5 }}>
+                <div style={{ fontFamily: F.display, fontSize: 17, letterSpacing: '-0.01em', textDecoration: item.available ? 'none' : 'line-through', textDecorationColor: L.faint }}>{item.name}</div>
+                <div className="num" style={{ fontSize: 12.5, color: L.dim, marginTop: 3 }}>RM {item.price.toFixed(2)}</div>
+              </div>
+              {!item.available && <span style={{ ...eyebrow, fontSize: 9, color: L.red }}>Sold out</span>}
+              <Switch on={item.available} onChange={() => onToggle(item.id)} />
+            </div>
           ))}
         </div>
-      </div>
-
-      <div style={{ padding: '12px 16px' }}>
-        {shown.map(item => (
-          <div key={item.id} style={{ background: L.surface, borderRadius: 14, padding: '14px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${L.border}`, opacity: item.available ? 1 : 0.6 }}>
-            <div>
-              <div style={{ fontFamily: "'Nunito'", fontWeight: 700, fontSize: 14, color: L.text, marginBottom: 2 }}>{item.name}</div>
-              <div style={{ fontFamily: "'Nunito'", fontWeight: 800, fontSize: 13, color: L.brand }}>RM {item.price}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {!item.available && <span style={{ fontSize: 10, color: L.red, fontFamily: "'Nunito'", fontWeight: 700 }}>SOLD OUT</span>}
-              <div
-                onClick={() => onToggle(item.id)}
-                style={{
-                  width: 44, height: 24, borderRadius: 100,
-                  background: item.available ? L.green : '#E5E5E5',
-                  cursor: 'pointer', position: 'relative', transition: 'all 0.2s', flexShrink: 0,
-                }}
-              >
-                <div style={{
-                  position: 'absolute', top: 3,
-                  left: item.available ? 23 : 3,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: '#fff',
-                  transition: 'left 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                }} />
-              </div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   )

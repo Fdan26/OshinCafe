@@ -1,5 +1,41 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Work+Sans:wght@400;500;600&display=swap');
+@import '@fontsource-variable/fraunces/opsz.css';
+@import '@fontsource-variable/manrope/index.css';
 @import 'tailwindcss';
+
+:root {
+  --font-display: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+  --font-ui: 'Manrope Variable', 'Manrope', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: currentColor;
+  opacity: 0.38;
+}
 
 .no-scroll {
   scrollbar-width: none;
@@ -8,42 +44,49 @@
   display: none;
 }
 
-body {
-  margin: 0;
-  font-family: 'Work Sans', sans-serif;
+/* Subtle press feedback for anything tappable */
+.tap {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+.tap:active {
+  transform: scale(0.97);
+  opacity: 0.85;
 }
 
-@media print {
-  body {
-    background: #fff !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+}
 
-  .app-shell {
-    background: #fff !important;
-    min-height: auto;
+/* Screen entrance */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-
-  .app-header,
-  .app-footer,
-  .app-switcher {
-    display: none !important;
+  to {
+    opacity: 1;
+    transform: none;
   }
+}
+.screen {
+  animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
 
-  .app-showcase {
-    padding: 8mm 0 !important;
-    justify-content: center;
-    gap: 12mm;
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
   }
-
-  .app-divider {
-    display: none !important;
+  to {
+    transform: none;
   }
+}
+.sheet {
+  animation: sheet-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
 
-  .phone-frame {
-    box-shadow: none !important;
-    border-color: #d0d0d0 !important;
-    transform: none !important;
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .sheet {
+    animation: none;
   }
 }
